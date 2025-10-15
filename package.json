@@ -1,0 +1,27 @@
+{
+  "name": "emotion_backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "Server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node Server.js",
+    "dev": "nodemon Server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@xenova/transformers": "^2.17.2",
+    "axios": "^1.12.2",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "nodemon": "^3.1.10",
+    "pg": "^8.16.3"
+  }
+}
