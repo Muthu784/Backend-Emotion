@@ -1,10 +1,19 @@
 import express from 'express';
-import { getChatMessages, sendMessage } from '../Controllers/chatController.js';
-import { protect } from '../Middlewares/authMiddleware.js';
+import {
+    getChatMessages,
+    sendMessage
+} from '../Controllers/chatController.js';
+
 
 const router = express.Router();
 
-router.get('/messages', protect, getChatMessages);
-router.post('/send', protect, sendMessage);
+
+// Routes that match frontend expectations
+router.get('/messages', getChatMessages); // GET /api/messages
+router.post('/send', sendMessage); // POST /api/send
+
+// Original routes (keep for backward compatibility)
+router.get('/chat/messages', getChatMessages);
+router.post('/chat/send', sendMessage);
 
 export default router;

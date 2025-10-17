@@ -2,38 +2,18 @@ import aiService from '../Services/aiService.js';
 
 export const getRecommendations = async (req, res, next) => {
     try {
-        const { emotion, text } = req.query;
+        const { emotion } = req.query;
 
-        let targetEmotion = emotion;
-
-        // If text is provided, analyze it to get emotion
-        if (text && !emotion) {
-            try {
-                const emotionAnalysis = await aiService.detectEmotion(text);
-                targetEmotion = emotionAnalysis.primary.label;
-            } catch (error) {
-                console.warn('Emotion analysis failed, using default:', error.message);
-            }
-        }
-
-        if (!targetEmotion) {
+        if (!emotion) {
             return res.status(400).json({
                 success: false,
-                message: 'Emotion parameter or text is required'
+                message: 'Emotion parameter is required'
             });
         }
 
-        const recommendations = await aiService.getPersonalizedRecommendations(targetEmotion);
+        const recommendations = await aiService.getPersonalizedRecommendations(emotion);
         
-        res.status(200).json({
-            success: true,
-            data: recommendations,
-            detectedEmotion: targetEmotion,
-            input: {
-                emotion: emotion,
-                text: text
-            }
-        });
+        res.json(recommendations);
     } catch (error) {
         next(error);
     }

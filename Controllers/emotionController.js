@@ -5,9 +5,8 @@ export const getEmotionHistory = async (req, res, next) => {
     try {
         const userId = req.user.id;
         const emotions = await getEmotionsByUserId(userId);
-        const userEmotion = emotions.filter(emotion => emotion.userId === req.user.userId);
         
-        res.json(userEmotion);
+        res.json(emotions); // Fixed: was filtering again unnecessarily
     } catch (error) {
         next(error);
     }
@@ -81,10 +80,14 @@ export const analyzeTextEmotion = async (req, res, next) => {
 
         const emotionAnalysis = await aiService.detectEmotion(text);
         
+        // Format response to match frontend expectations
         res.status(200).json({
-            success: true,
-            data: emotionAnalysis,
-            text: text
+            emotion: emotionAnalysis.primary.label,
+            confidence: emotionAnalysis.primary.score,
+            scores: emotionAnalysis.all.map(item => ({
+                label: item.label,
+                score: item.score
+            }))
         });
     } catch (error) {
         next(error);

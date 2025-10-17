@@ -31,8 +31,17 @@ app.use('/api/emotions', emotionRouter);
 app.use('/api/chat', chatRoute);
 app.use('/api/recommendations', recommendationRouter);
 
+// Add direct routes that match frontend expectations
+app.use('/api', emotionRouter); // This will make /api/analyze available
+app.use('/api', chatRoute); // This will make /api/messages available
+
 app.get('/', (req,res)=>{
     res.send('EmotiChat AI Server with Hugging Face Integration');
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK', message: 'Server is running' });
 });
 
 // Centralized Error Handler
