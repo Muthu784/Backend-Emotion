@@ -5,11 +5,9 @@ export const getEmotionHistory = async (req, res, next) => {
     try {
         const userId = req.user.id;
         const emotions = await getEmotionsByUserId(userId);
+        const userEmotion = emotions.filter(emotion => emotion.userId === req.user.userId);
         
-        res.status(200).json({
-            success: true,
-            data: emotions
-        });
+        res.json(userEmotion);
     } catch (error) {
         next(error);
     }

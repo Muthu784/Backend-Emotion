@@ -1,4 +1,4 @@
-import { pipeline, Pipeline } from '@xenova/transformers';
+import { pipeline } from '@xenova/transformers';
 
 class AIService {
     constructor() {
