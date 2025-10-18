@@ -9,6 +9,8 @@ import { ensureUsersTable } from "./Model/user.js";
 import { ensureEmotionsTable } from "./Model/emotion.js";
 import { ensureChatMessagesTable } from "./Model/chat.js";
 import ErrorHandler from "./Middlewares/ErrorHandler.js";
+import rateLimitMiddleware from "./Middlewares/RateLimitMiddleware.js";
+
 
 dotenv.config();
 
@@ -34,6 +36,9 @@ app.use('/api/recommendations', recommendationRouter);
 // Add direct routes that match frontend expectations
 app.use('/api', emotionRouter); // This will make /api/analyze available
 app.use('/api', chatRoute); // This will make /api/messages available
+
+// Rate Limiting Middleware
+app.use(rateLimitMiddleware);
 
 app.get('/', (req,res)=>{
     res.send('EmotiChat AI Server with Hugging Face Integration');

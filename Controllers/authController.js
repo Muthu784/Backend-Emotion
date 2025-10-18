@@ -9,7 +9,7 @@ const generateToken = (userId) => {
 
 export const registerUser = async (req, res, next) => {
     try {
-        // console.log('Register request body:', req.body);
+        
         const { user, email } = req.body || {};
         
         // Validate required fields
@@ -18,7 +18,7 @@ export const registerUser = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Please provide user and email' });
         }
 
-        // Extract user data - FIXED: use username instead of name
+        
         const { username, password } = user;
         
         if (!username || !password) {
@@ -63,7 +63,6 @@ export const registerUser = async (req, res, next) => {
 
 export const LoginUser = async (req, res, next) => {
     try {
-        // console.log('Login request body:', req.body);
         const { email, password } = req.body || {};
         
         if (!email || !password) {
@@ -77,7 +76,6 @@ export const LoginUser = async (req, res, next) => {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
-        console.log('User found, verifying password...');
         // Verify password
         const isPasswordValid = await bcrypt.compare(password, userRecord.password);
         if (!isPasswordValid) {
@@ -139,6 +137,7 @@ export const updateProfile = async (req, res, next) => {
         }
 
         const user = await getUserById(id);
+
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
