@@ -43,13 +43,11 @@ export const registerUser = async (req, res, next) => {
             password: hashedPassword
         };
 
-        console.log('Creating user with data:', { ...userData, password: '[HASHED]' });
         const createdUser = await createUser(userData);
         
         // Remove password from response
         const { password: _, ...userWithoutPassword } = createdUser;
         
-        console.log('User created successfully:', userWithoutPassword);
         res.status(201).json({
             success: true,
             user: userWithoutPassword,

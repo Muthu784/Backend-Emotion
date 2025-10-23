@@ -15,25 +15,40 @@ class AIService {
         try {
             console.log('Loading AI models...');
             
-            // Load emotion classification model
-            this.emotionClassifier = await pipeline(
-                'text-classification',
-                'j-hartmann/emotion-english-distilroberta-base'
-            );
-            console.log('Emotion model loaded');
+            try {
+                // Try to load emotion classification model with error handling
+                this.emotionClassifier = await pipeline(
+                    'text-classification',
+                    'j-hartmann/emotion-english-distilroberta-base',
+                    { quantized: false } // Try without quantized model
+                );
+                console.log('Emotion model loaded');
+            } catch (error) {
+                console.warn('Could not load emotion model, using fallback responses');
+                this.emotionClassifier = null;
+            }
 
-            // Load sentence embedding model for recommendations
-            this.embedder = await pipeline(
-                'feature-extraction',
-                'sentence-transformers/all-MiniLM-L6-v2'
-            );
-            console.log('Embedding model loaded');
+            try {
+                // Try to load sentence embedding model with error handling
+                this.embedder = await pipeline(
+                    'feature-extraction',
+                    'sentence-transformers/all-MiniLM-L6-v2',
+                    { quantized: false } // Try without quantized model
+                );
+                console.log('Embedding model loaded');
+            } catch (error) {
+                console.warn('Could not load embedding model, using fallback recommendations');
+                this.embedder = null;
+            }
 
-            // Note: DialoGPT is quite large, we'll use a simpler approach for chat
-            console.log('AI models loaded successfully');
+            if (!this.emotionClassifier && !this.embedder) {
+                console.warn('Running in fallback mode - some features may be limited');
+            } else {
+                console.log('AI models loaded successfully');
+            }
         } catch (error) {
-            console.error('Error loading AI models:', error);
-            throw error;
+            console.error('Error during model initialization:', error);
+            // Don't throw, continue with limited functionality
         } finally {
             this.isInitializing = false;
         }
@@ -113,144 +128,137 @@ class AIService {
         };
     }
 
-    async getPersonalizedRecommendations(userEmotion, userPreferences = {}) {
+    async getPersonalizedRecommendations(emotion) {
         if (!this.embedder) {
             await this.initializeModels();
         }
 
-        // Enhanced recommendation database with embeddings
-        const recommendations = {
-            anger: [
-                {
-                    id: 1,
-                    type: 'activity',
-                    title: 'Deep Breathing Exercise',
-                    description: '5-minute guided breathing to calm your nervous system',
-                    emotion: 'anger',
-                    url: 'https://www.verywellmind.com/deep-breathing-exercises-to-reduce-anxiety-3144706',
-                    tags: ['calming', 'immediate', 'free']
-                },
-                {
-                    id: 2,
-                    type: 'music',
-                    title: 'Calming Instrumental Playlist',
-                    description: 'Soothing classical and ambient music',
-                    emotion: 'anger',
-                    url: 'https://open.spotify.com/playlist/37i9dQZF1DX4sWSpwq3LiO',
-                    tags: ['relaxing', 'focus', 'instrumental']
-                },
-                {
-                    id: 3,
-                    type: 'exercise',
-                    title: 'Progressive Muscle Relaxation',
-                    description: 'Release physical tension through systematic relaxation',
-                    emotion: 'anger',
-                    url: 'https://www.healthline.com/health/progressive-muscle-relaxation',
-                    tags: ['physical', 'tension-release', 'guided']
-                }
-            ],
-            sadness: [
-                {
-                    id: 4,
-                    type: 'movie',
-                    title: 'The Pursuit of Happyness',
-                    description: 'Inspiring true story about overcoming adversity',
-                    emotion: 'sadness',
-                    url: 'https://www.imdb.com/title/tt0454921/',
-                    tags: ['inspiring', 'hope', 'true-story']
-                },
-                {
-                    id: 5,
-                    type: 'book',
-                    title: 'The Comfort Book',
-                    description: 'Reflections offering comfort and reassurance',
-                    emotion: 'sadness',
-                    url: 'https://www.goodreads.com/book/show/55815207-the-comfort-book',
-                    tags: ['comforting', 'reflective', 'easy-read']
-                },
-                {
-                    id: 6,
-                    type: 'activity',
-                    title: 'Gratitude Journaling',
-                    description: 'Write down three things you appreciate today',
-                    emotion: 'sadness',
-                    url: null,
-                    tags: ['positive', 'reflective', 'personal']
-                }
-            ],
-            joy: [
-                {
-                    id: 7,
-                    type: 'music',
-                    title: 'Upbeat Happy Playlist',
-                    description: 'Energetic songs to amplify your good mood',
-                    emotion: 'joy',
-                    url: 'https://open.spotify.com/playlist/37i9dQZF1DXdPec7aLTmlC',
-                    tags: ['energetic', 'dance', 'celebratory']
-                },
-                {
-                    id: 8,
-                    type: 'activity',
-                    title: 'Creative Expression',
-                    description: 'Channel your positive energy into art or writing',
-                    emotion: 'joy',
-                    url: null,
-                    tags: ['creative', 'expressive', 'fun']
-                }
-            ],
-            fear: [
-                {
-                    id: 9,
-                    type: 'exercise',
-                    title: 'Grounding Technique: 5-4-3-2-1',
-                    description: 'Use your senses to stay present and reduce anxiety',
-                    emotion: 'fear',
-                    url: 'https://www.healthline.com/health/grounding-techniques',
-                    tags: ['immediate', 'sensory', 'calming']
-                },
-                {
-                    id: 10,
-                    type: 'book',
-                    title: 'Feel the Fear and Do It Anyway',
-                    description: 'Classic book on overcoming fear and taking action',
-                    emotion: 'fear',
-                    url: 'https://www.goodreads.com/book/show/62518.Feel_the_Fear_and_Do_It_Anyway',
-                    tags: ['empowering', 'practical', 'classic']
-                }
-            ]
-        };
+        try {
+            // In a real implementation, you would use the embedding model to find similar content
+            // For now, we'll return some static recommendations based on emotion
+            const recommendations = {
+                anger: [
+                    { 
+                        id: 'anger-1',
+                        type: 'activity', 
+                        title: 'Deep Breathing Exercise', 
+                        description: '5-minute guided breathing to calm your mind',
+                        duration: '5 min',
+                        category: 'mindfulness'
+                    },
+                    { 
+                        id: 'anger-2',
+                        type: 'article', 
+                        title: 'Managing Anger', 
+                        description: 'Healthy ways to process and express anger',
+                        readTime: '4 min',
+                        category: 'emotional health'
+                    },
+                    { 
+                        id: 'anger-3',
+                        type: 'quote', 
+                        content: 'For every minute you remain angry, you give up sixty seconds of peace of mind.', 
+                        author: 'Ralph Waldo Emerson',
+                        category: 'inspiration'
+                    }
+                ],
+                sadness: [
+                    { 
+                        id: 'sadness-1',
+                        type: 'activity', 
+                        title: 'Gratitude Journal', 
+                        description: 'Write down three things you\'re grateful for today',
+                        duration: '10 min',
+                        category: 'mindfulness'
+                    },
+                    { 
+                        id: 'sadness-2',
+                        type: 'article', 
+                        title: 'Coping with Sadness', 
+                        description: 'Strategies for when you\'re feeling down',
+                        readTime: '6 min',
+                        category: 'emotional health'
+                    },
+                    { 
+                        id: 'sadness-3',
+                        type: 'quote', 
+                        content: 'This too shall pass.',
+                        author: 'Persian adage',
+                        category: 'comfort'
+                    }
+                ],
+                joy: [
+                    { 
+                        id: 'joy-1',
+                        type: 'activity', 
+                        title: 'Share Your Joy', 
+                        description: 'Call a friend and share what\'s making you happy',
+                        duration: '15 min',
+                        category: 'connection'
+                    },
+                    { 
+                        id: 'joy-2',
+                        type: 'article', 
+                        title: 'Spreading Happiness', 
+                        description: 'How your joy can positively impact others',
+                        readTime: '5 min',
+                        category: 'emotional health'
+                    },
+                    { 
+                        id: 'joy-3',
+                        type: 'quote', 
+                        content: 'The joy we give to others comes back to us.',
+                        author: 'Unknown',
+                        category: 'inspiration'
+                    }
+                ],
+                fear: [
+                    { 
+                        id: 'fear-1',
+                        type: 'activity', 
+                        title: 'Grounding Exercise', 
+                        description: '5-4-3-2-1 technique to reduce anxiety',
+                        duration: '5 min',
+                        category: 'anxiety relief'
+                    },
+                    { 
+                        id: 'fear-2',
+                        type: 'article', 
+                        title: 'Facing Your Fears', 
+                        description: 'A step-by-step guide to managing anxiety',
+                        readTime: '8 min',
+                        category: 'emotional health'
+                    },
+                    { 
+                        id: 'fear-3',
+                        type: 'quote', 
+                        content: 'The only thing we have to fear is fear itself.', 
+                        author: 'Franklin D. Roosevelt',
+                        category: 'courage'
+                    }
+                ]
+            };
 
-        // Get recommendations for the specific emotion
-        let emotionRecs = recommendations[userEmotion] || [];
-        
-        // If no specific recommendations, provide general wellness tips
-        if (emotionRecs.length === 0) {
-            emotionRecs = [
+            // Default to neutral if emotion not found
+            const emotionRecs = recommendations[emotion.toLowerCase()] || [
                 {
-                    id: 11,
+                    id: 'neutral-1',
                     type: 'activity',
                     title: 'Mindful Breathing',
-                    description: 'Take a moment to focus on your breath and be present',
-                    emotion: 'general',
-                    url: null,
-                    tags: ['mindfulness', 'immediate', 'free']
-                },
-                {
-                    id: 12,
-                    type: 'resource',
-                    title: 'Mental Health Hotline',
-                    description: 'Talk to someone who can provide immediate support',
-                    emotion: 'general',
-                    url: 'https://www.mentalhealth.gov/get-help/immediate-help',
-                    tags: ['support', 'immediate', 'professional']
+                    description: 'Take a moment to focus on your breath',
+                    duration: '3 min',
+                    category: 'mindfulness'
                 }
             ];
-        }
 
-        // Shuffle and return 3 recommendations
-        return emotionRecs
-            .sort(() => 0.5 - Math.random())
-            .slice(0, 3);
+            // Shuffle and return 3 recommendations
+            return emotionRecs
+                .sort(() => 0.5 - Math.random())
+                .slice(0, 3);
+        } catch (error) {
+            console.error('Error in personalized recommendations:', error);
+            throw new Error('Failed to generate recommendations');
+        }
     }
 
     // Utility function to calculate cosine similarity

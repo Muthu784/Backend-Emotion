@@ -1,15 +1,17 @@
 import express from 'express';
 import {
-    getRecommendations
+    getRecommendations,
+    getRandomRecommendations
 } from '../Controllers/recommendationController.js';
 
 const router = express.Router();
 
 
-// Routes that match frontend expectations
-router.get('/getRecommendations', getRecommendations); // GET /api/getRecommendations
+// Recommendation endpoints
+router.get('/', getRecommendations);           // GET /api/recommendations?emotion=:emotion
+router.get('/random', getRandomRecommendations); // GET /api/recommendations/random
 
-// Original routes (keep for backward compatibility)
-router.get('/recommendations', getRecommendations);
+// Backward compatibility routes (deprecated)
+router.get('/getRecommendations', getRecommendations);
 
 export default router;

@@ -10,6 +10,7 @@ import { ensureEmotionsTable } from "./Model/emotion.js";
 import { ensureChatMessagesTable } from "./Model/chat.js";
 import ErrorHandler from "./Middlewares/ErrorHandler.js";
 import rateLimitMiddleware from "./Middlewares/RateLimitMiddleware.js";
+import { getRandomRecommendations } from "./Controllers/recommendationController.js";
 
 
 dotenv.config();
@@ -32,6 +33,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/emotions', emotionRouter);
 app.use('/api/chat', chatRoute);
 app.use('/api/recommendations', recommendationRouter);
+app.use('/api/random', getRandomRecommendations);
 
 // Add direct routes that match frontend expectations
 app.use('/api', emotionRouter); // This will make /api/analyze available
