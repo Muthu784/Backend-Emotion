@@ -29,6 +29,13 @@ export const getRandomRecommendations = async (req, res, next) => {
     try {
         const recommendations = await aiService.getRandomRecommendations();
         
+        if (!recommendations || recommendations.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No recommendations found, Start chat to get recommendations'
+            });
+        }
+        
         res.json({
             success: true,
             data: recommendations,

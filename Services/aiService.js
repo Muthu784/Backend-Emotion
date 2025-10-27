@@ -20,7 +20,7 @@ class AIService {
                 this.emotionClassifier = await pipeline(
                     'text-classification',
                     'j-hartmann/emotion-english-distilroberta-base',
-                    { quantized: false } // Try without quantized model
+                    { quantized: true } 
                 );
                 console.log('Emotion model loaded');
             } catch (error) {
@@ -33,7 +33,7 @@ class AIService {
                 this.embedder = await pipeline(
                     'feature-extraction',
                     'sentence-transformers/all-MiniLM-L6-v2',
-                    { quantized: false } // Try without quantized model
+                    { quantized: true } 
                 );
                 console.log('Embedding model loaded');
             } catch (error) {
