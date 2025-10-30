@@ -8,9 +8,11 @@ import chatRoute from "./Routes/chatRoute.js";
 import { ensureUsersTable } from "./Model/user.js";
 import { ensureEmotionsTable } from "./Model/emotion.js";
 import { ensureChatMessagesTable } from "./Model/chat.js";
+import { protect } from "./Middlewares/authMiddleware.js";
 import ErrorHandler from "./Middlewares/ErrorHandler.js";
 import rateLimitMiddleware from "./Middlewares/RateLimitMiddleware.js";
 import { getRandomRecommendations } from "./Controllers/recommendationController.js";
+import aiServiceRoute from "./Routes/aiServiceRoute.js";
 
 
 dotenv.config();
@@ -30,10 +32,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
 app.use('/api/auth', authRouter);
-app.use('/api/emotions', emotionRouter);
-app.use('/api/chat', chatRoute);
-app.use('/api/recommendations', recommendationRouter);
-app.use('/api/random', getRandomRecommendations);
+
+// Protected routes
+app.use('/api/emotions', protect, emotionRouter);
+app.use('/api/chat', protect, chatRoute);
+app.use('/api/recommendations', protect, recommendationRouter);
+app.use('/api/random', protect, getRandomRecommendations);
+app.use('/api/aiService', protect, aiServiceRoute);
 
 // Add direct routes that match frontend expectations
 app.use('/api', emotionRouter); // This will make /api/analyze available
@@ -43,7 +48,7 @@ app.use('/api', chatRoute); // This will make /api/messages available
 app.use(rateLimitMiddleware);
 
 app.get('/', (req,res)=>{
-    res.send('EmotiChat AI Server with Hugging Face Integration');
+    res.send('Emotion Companion AI Server with Hugging Face Integration Working');
 });
 
 // Health check

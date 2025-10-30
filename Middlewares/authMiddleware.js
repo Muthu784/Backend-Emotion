@@ -1,21 +1,24 @@
+// Middlewares/authMiddleware.js
 import jwt from 'jsonwebtoken';
 import { getUserById } from '../Model/user.js';
 
 export const protect = async (req, res, next) => {
     try {
         let token;
-
+        
         // Get token from header
-        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
             token = req.headers.authorization.split(' ')[1];
         }
+        // Or get token from cookies
+        else if (req.cookies && req.cookies.token) {
+            token = req.cookies.token;
+        }
 
-        // Check if no token
         if (!token) {
-            console.log('No token provided');
-            return res.status(401).json({ 
-                success: false, 
-                message: 'Not authorized, no token' 
+            return res.status(401).json({
+                success: false,
+                error: 'Not authorized to access this route'
             });
         }
 
@@ -23,41 +26,31 @@ export const protect = async (req, res, next) => {
             // Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             
-            if (!decoded || !decoded.id) {
-                console.log('Invalid token payload:', decoded);
-                throw new Error('Invalid token payload');
-            }
-
             // Get user from the token
             const user = await getUserById(decoded.id);
             
             if (!user) {
-                console.log('User not found with ID:', decoded.id);
-                return res.status(401).json({ 
-                    success: false, 
-                    message: 'User not found' 
+                return res.status(401).json({
+                    success: false,
+                    error: 'User not found'
                 });
             }
 
-            // Create user object with only necessary fields
-            const userData = {
-                id: user.id,
-                username: user.username,
-                email: user.email
-            };
-
             // Attach user to request object
-            req.user = userData;
+            req.user = user;
             next();
         } catch (error) {
-            console.error('Token verification failed:', error.message);
-            return res.status(401).json({ 
-                success: false, 
-                message: 'Not authorized, token failed' 
+            console.error('Token verification failed:', error);
+            return res.status(401).json({
+                success: false,
+                error: 'Not authorized, token failed'
             });
         }
     } catch (error) {
-        console.error('Protect middleware error:', error);
-        next(error);
+        console.error('Authentication error:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Server error during authentication'
+        });
     }
 };

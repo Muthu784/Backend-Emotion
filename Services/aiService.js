@@ -1,275 +1,263 @@
-import { pipeline } from '@xenova/transformers';
+import OpenAI from 'openai';
 
 class AIService {
     constructor() {
-        this.emotionClassifier = null;
-        this.chatGenerator = null;
-        this.embedder = null;
-        this.isInitializing = false;
-    }
-
-    async initializeModels() {
-        if (this.isInitializing) return;
-        this.isInitializing = true;
-
-        try {
-            console.log('Loading AI models...');
-            
-            try {
-                // Try to load emotion classification model with error handling
-                this.emotionClassifier = await pipeline(
-                    'text-classification',
-                    'j-hartmann/emotion-english-distilroberta-base',
-                    { quantized: true } 
-                );
-                console.log('Emotion model loaded');
-            } catch (error) {
-                console.warn('Could not load emotion model, using fallback responses');
-                this.emotionClassifier = null;
-            }
-
-            try {
-                // Try to load sentence embedding model with error handling
-                this.embedder = await pipeline(
-                    'feature-extraction',
-                    'sentence-transformers/all-MiniLM-L6-v2',
-                    { quantized: true } 
-                );
-                console.log('Embedding model loaded');
-            } catch (error) {
-                console.warn('Could not load embedding model, using fallback recommendations');
-                this.embedder = null;
-            }
-
-            if (!this.emotionClassifier && !this.embedder) {
-                console.warn('Running in fallback mode - some features may be limited');
-            } else {
-                console.log('AI models loaded successfully');
-            }
-        } catch (error) {
-            console.error('Error during model initialization:', error);
-            // Don't throw, continue with limited functionality
-        } finally {
-            this.isInitializing = false;
-        }
+        this.openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY
+        });
+        this.emotionLabels = ['happy', 'sad', 'angry', 'fear', 'surprise', 'neutral'];
     }
 
     async detectEmotion(text) {
-        if (!this.emotionClassifier) {
-            await this.initializeModels();
+        if (!text || typeof text !== 'string') {
+            throw new Error('Invalid input: text must be a non-empty string');
         }
 
         try {
-            const result = await this.emotionClassifier(text, {
-                topk: 3 // Get top 3 emotions
+            // Use OpenAI to detect emotion
+            const response = await this.openai.chat.completions.create({
+                model: 'gpt-3.5-turbo',
+                messages: [
+                    {
+                        role: 'system',
+                        content: `Analyze the following text and respond with a JSON object containing:
+                        - emotion: The primary emotion (one of: ${this.emotionLabels.join(', ')})
+                        - confidence: A confidence score between 0 and 1
+                        - scores: An array of objects with all possible emotions and their scores
+
+                        Example response:
+                        {
+                            "emotion": "happy",
+                            "confidence": 0.95,
+                            "scores": [
+                                {"label": "happy", "score": 0.95},
+                                {"label": "sad", "score": 0.02},
+                                {"label": "angry", "score": 0.01},
+                                {"label": "fear", "score": 0.01},
+                                {"label": "surprise", "score": 0.01},
+                                {"label": "neutral", "score": 0.0}
+                            ]
+                        }`
+                    },
+                    {
+                        role: 'user',
+                        content: text
+                    }
+                ],
+                temperature: 0.3,
+                max_tokens: 200,
+                response_format: { type: "json_object" }
             });
 
-            // Format the response
-            const emotions = result.map(emotion => ({
-                label: emotion.label.toLowerCase(),
-                score: emotion.score,
-                percentage: Math.round(emotion.score * 100)
-            }));
+            // Parse the response
+            const result = JSON.parse(response.choices[0].message.content);
+            
+            // Ensure the response has the expected format
+            if (!result.emotion || !result.confidence || !result.scores) {
+                throw new Error('Invalid response format from OpenAI');
+            }
 
             return {
-                primary: emotions[0],
-                secondary: emotions.slice(1),
-                all: emotions
+                primary: {
+                    label: result.emotion,
+                    score: result.confidence,
+                    percentage: Math.round(result.confidence * 100)
+                },
+                all: result.scores.map(score => ({
+                    label: score.label,
+                    score: score.score,
+                    percentage: Math.round(score.score * 100)
+                }))
             };
         } catch (error) {
-            console.error('Error in emotion detection:', error);
-            throw new Error('Failed to analyze emotions');
+            console.error('Error in emotion detection with OpenAI:', error);
+            return this.fallbackEmotionDetection(text);
         }
     }
 
-    async generateEmpatheticResponse(userMessage, userEmotion) {
-        // Simple rule-based empathetic responses
-        // In production, you could use DialoGPT or another conversational model
-        const responses = {
-            anger: [
-                "I can sense you're feeling frustrated. It's okay to feel this way. Would you like to talk about what's bothering you?",
-                "I hear the anger in your words. Sometimes expressing these feelings can help release them.",
-                "It sounds like you're really upset. I'm here to listen without judgment."
-            ],
-            sadness: [
-                "I'm sorry you're feeling down. Remember that it's okay to feel sad sometimes.",
-                "Your feelings are valid. Would sharing more help lighten the burden?",
-                "I'm here with you in this moment of sadness. You're not alone."
-            ],
-            fear: [
-                "It sounds like you're feeling anxious. Let's breathe through this together.",
-                "Fear can be overwhelming. What's one small step that might help you feel safer?",
-                "I understand this feels scary. Remember that this moment will pass."
-            ],
-            joy: [
-                "It's wonderful to hear your happiness! What's making you feel so good?",
-                "Your joy is contagious! Celebrate these positive moments.",
-                "I'm so glad you're feeling happy! Savor this feeling."
-            ],
-            neutral: [
-                "Thanks for sharing. How has your day been so far?",
-                "I'm here to listen. What's on your mind?",
-                "Tell me more about what you're experiencing right now."
-            ],
-            surprise: [
-                "That sounds unexpected! How are you feeling about this surprise?",
-                "Life can be full of surprises. Would you like to explore this further?",
-                "That's quite surprising! What are your thoughts about this?"
-            ]
+    async chatWithEmotion(message) {
+        try {
+            // First detect the emotion
+            const emotionAnalysis = await this.detectEmotion(message);
+            const primaryEmotion = emotionAnalysis.primary.label;
+
+            // Generate a response based on the detected emotion
+            const response = await this.openai.chat.completions.create({
+                model: 'gpt-3.5-turbo',
+                messages: [
+                    {
+                        role: 'system',
+                        content: `You are an empathetic AI assistant. The user is feeling ${primaryEmotion}. 
+                        Respond in a way that is appropriate for their emotional state. 
+                        Keep responses concise and supportive.`
+                    },
+                    {
+                        role: 'user',
+                        content: message
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 200
+            });
+
+            return {
+                response: response.choices[0].message.content,
+                detectedEmotion: {
+                    label: primaryEmotion,
+                    score: emotionAnalysis.primary.score,
+                    percentage: emotionAnalysis.primary.percentage
+                },
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            console.error('Error in chatWithEmotion:', error);
+            return {
+                response: "I'm having trouble understanding. Could you rephrase that?",
+                detectedEmotion: {
+                    label: 'neutral',
+                    score: 1,
+                    percentage: 100
+                },
+                timestamp: new Date().toISOString()
+            };
+        }
+    }
+
+    // Fallback method if OpenAI fails
+    fallbackEmotionDetection(text) {
+        // Simple keyword-based fallback
+        const textLower = text.toLowerCase();
+        const emotions = this.emotionLabels.map(label => ({
+            label,
+            score: label === 'neutral' ? 1 : 0.1, // Default to neutral
+            percentage: label === 'neutral' ? 100 : 10
+        }));
+
+        // Simple keyword matching
+        const emotionKeywords = {
+            happy: ['happy', 'good', 'great', 'wonderful', 'amazing', 'excited'],
+            sad: ['sad', 'unhappy', 'depressed', 'miserable', 'upset'],
+            angry: ['angry', 'mad', 'furious', 'annoyed', 'frustrated'],
+            fear: ['scared', 'afraid', 'fear', 'terrified', 'nervous'],
+            surprise: ['surprise', 'shocked', 'amazed', 'astonished']
         };
 
-        const emotionResponses = responses[userEmotion] || responses.neutral;
-        const randomResponse = emotionResponses[Math.floor(Math.random() * emotionResponses.length)];
+        // Check for emotion keywords
+        for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
+            if (keywords.some(keyword => textLower.includes(keyword))) {
+                const emotionIndex = emotions.findIndex(e => e.label === emotion);
+                if (emotionIndex !== -1) {
+                    emotions[emotionIndex].score = 0.9;
+                    emotions[emotionIndex].percentage = 90;
+                    // Reduce neutral score
+                    const neutralIndex = emotions.findIndex(e => e.label === 'neutral');
+                    emotions[neutralIndex].score = 0.1;
+                    emotions[neutralIndex].percentage = 10;
+                    break;
+                }
+            }
+        }
 
         return {
-            response: randomResponse,
-            suggested_emotion: userEmotion,
-            timestamp: new Date().toISOString()
+            primary: emotions.reduce((prev, current) => 
+                (prev.score > current.score) ? prev : current
+            ),
+            all: emotions
         };
     }
 
     async getPersonalizedRecommendations(emotion) {
-        if (!this.embedder) {
-            await this.initializeModels();
-        }
-
         try {
-            // In a real implementation, you would use the embedding model to find similar content
-            // For now, we'll return some static recommendations based on emotion
-            const recommendations = {
-                anger: [
-                    { 
-                        id: 'anger-1',
-                        type: 'activity', 
-                        title: 'Deep Breathing Exercise', 
-                        description: '5-minute guided breathing to calm your mind',
-                        duration: '5 min',
-                        category: 'mindfulness'
-                    },
-                    { 
-                        id: 'anger-2',
-                        type: 'article', 
-                        title: 'Managing Anger', 
-                        description: 'Healthy ways to process and express anger',
-                        readTime: '4 min',
-                        category: 'emotional health'
-                    },
-                    { 
-                        id: 'anger-3',
-                        type: 'quote', 
-                        content: 'For every minute you remain angry, you give up sixty seconds of peace of mind.', 
-                        author: 'Ralph Waldo Emerson',
-                        category: 'inspiration'
+            const response = await this.openai.chat.completions.create({
+                model: 'gpt-3.5-turbo',
+                messages: [
+                    {
+                        role: 'system',
+                        content: `You are a helpful assistant that provides recommendations based on emotions.
+                        The user is feeling ${emotion}. 
+                        Provide 3 personalized recommendations in JSON format:
+                        {
+                            "recommendations": [
+                                {
+                                    "type": "movie|book|music|activity|exercise|resource",
+                                    "title": "Recommendation title",
+                                    "description": "Brief description",
+                                    "emotion": "${emotion}",
+                                    "url": "Optional URL"
+                                }
+                            ]
+                        }`
                     }
                 ],
-                sadness: [
-                    { 
-                        id: 'sadness-1',
-                        type: 'activity', 
-                        title: 'Gratitude Journal', 
-                        description: 'Write down three things you\'re grateful for today',
-                        duration: '10 min',
-                        category: 'mindfulness'
-                    },
-                    { 
-                        id: 'sadness-2',
-                        type: 'article', 
-                        title: 'Coping with Sadness', 
-                        description: 'Strategies for when you\'re feeling down',
-                        readTime: '6 min',
-                        category: 'emotional health'
-                    },
-                    { 
-                        id: 'sadness-3',
-                        type: 'quote', 
-                        content: 'This too shall pass.',
-                        author: 'Persian adage',
-                        category: 'comfort'
-                    }
-                ],
-                joy: [
-                    { 
-                        id: 'joy-1',
-                        type: 'activity', 
-                        title: 'Share Your Joy', 
-                        description: 'Call a friend and share what\'s making you happy',
-                        duration: '15 min',
-                        category: 'connection'
-                    },
-                    { 
-                        id: 'joy-2',
-                        type: 'article', 
-                        title: 'Spreading Happiness', 
-                        description: 'How your joy can positively impact others',
-                        readTime: '5 min',
-                        category: 'emotional health'
-                    },
-                    { 
-                        id: 'joy-3',
-                        type: 'quote', 
-                        content: 'The joy we give to others comes back to us.',
-                        author: 'Unknown',
-                        category: 'inspiration'
-                    }
-                ],
-                fear: [
-                    { 
-                        id: 'fear-1',
-                        type: 'activity', 
-                        title: 'Grounding Exercise', 
-                        description: '5-4-3-2-1 technique to reduce anxiety',
-                        duration: '5 min',
-                        category: 'anxiety relief'
-                    },
-                    { 
-                        id: 'fear-2',
-                        type: 'article', 
-                        title: 'Facing Your Fears', 
-                        description: 'A step-by-step guide to managing anxiety',
-                        readTime: '8 min',
-                        category: 'emotional health'
-                    },
-                    { 
-                        id: 'fear-3',
-                        type: 'quote', 
-                        content: 'The only thing we have to fear is fear itself.', 
-                        author: 'Franklin D. Roosevelt',
-                        category: 'courage'
-                    }
-                ]
-            };
+                temperature: 0.7,
+                max_tokens: 500,
+                response_format: { type: "json_object" }
+            });
 
-            // Default to neutral if emotion not found
-            const emotionRecs = recommendations[emotion.toLowerCase()] || [
-                {
-                    id: 'neutral-1',
-                    type: 'activity',
-                    title: 'Mindful Breathing',
-                    description: 'Take a moment to focus on your breath',
-                    duration: '3 min',
-                    category: 'mindfulness'
-                }
-            ];
-
-            // Shuffle and return 3 recommendations
-            return emotionRecs
-                .sort(() => 0.5 - Math.random())
-                .slice(0, 3);
+            const result = JSON.parse(response.choices[0].message.content);
+            return result.recommendations || [];
         } catch (error) {
-            console.error('Error in personalized recommendations:', error);
-            throw new Error('Failed to generate recommendations');
+            console.error('Error getting recommendations:', error);
+            return this.getFallbackRecommendations(emotion);
         }
     }
 
-    // Utility function to calculate cosine similarity
-    cosineSimilarity(a, b) {
-        const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
-        const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
-        const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
-        return dotProduct / (magnitudeA * magnitudeB);
+    getFallbackRecommendations(emotion) {
+        // Simple fallback recommendations
+        const recommendations = {
+            happy: [
+                {
+                    type: 'activity',
+                    title: 'Go for a walk outside',
+                    description: 'Enjoy the nice weather and fresh air',
+                    emotion: 'happy'
+                },
+                {
+                    type: 'music',
+                    title: 'Upbeat playlist',
+                    description: 'Listen to some happy, energetic music',
+                    emotion: 'happy'
+                }
+            ],
+            sad: [
+                {
+                    type: 'movie',
+                    title: 'Feel-good movie',
+                    description: 'Watch a heartwarming movie to lift your spirits',
+                    emotion: 'sad'
+                },
+                {
+                    type: 'activity',
+                    title: 'Call a friend',
+                    description: 'Reach out to someone you trust',
+                    emotion: 'sad'
+                }
+            ],
+            angry: [
+                {
+                    type: 'exercise',
+                    title: 'Deep breathing',
+                    description: 'Practice deep breathing exercises to calm down',
+                    emotion: 'angry'
+                },
+                {
+                    type: 'activity',
+                    title: 'Journaling',
+                    description: 'Write down your thoughts and feelings',
+                    emotion: 'angry'
+                }
+            ]
+        };
+
+        return recommendations[emotion] || [
+            {
+                type: 'activity',
+                title: 'Take a break',
+                description: 'Step away and do something you enjoy',
+                emotion: 'neutral'
+            }
+        ];
     }
 }
 
-// Create singleton instance
-const aiService = new AIService();
-export default aiService;
+export default new AIService();
